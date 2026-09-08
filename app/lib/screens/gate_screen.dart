@@ -8,18 +8,7 @@ import '../theme/palette.dart';
 
 enum _Phase { question, feedback, granted }
 
-/// The interruption. Shown full-screen over a blocked app the instant it
-/// launches (see README's core loop). Everything here follows the
-/// design principles directly:
-///
-///   - Gate on engagement, not correctness (#3): a wrong answer still
-///     grants entry, just a shorter one.
-///   - Tax intent, not time (#4): [PassService.costForEntry] decides how
-///     many questions this particular entry costs, via the rolling-hour
-///     count in `QuestionRepository.registerEntryAndGetCost`.
-///   - A sub-threshold answer doesn't count at all — it's discarded and
-///     the same item is re-served, so tapping randomly fast isn't a way
-///     to skip the cost.
+/// The screen that appears over the blocked app.
 ///
 /// [passService] is exposed for tests/tuning; leave it at its default
 /// in real usage.
@@ -40,73 +29,7 @@ class GateScreen extends StatefulWidget {
 }
 
 class _GateScreenState extends State<GateScreen> {
-  late int _requiredCount;
-  int _answeredCount = 0;
-  late Question _current;
-  int? _selectedIndex;
-  AnswerResult? _lastResult;
-  String? _tooFastNotice;
-  _Phase _phase = _Phase.question;
-  final Stopwatch _stopwatch = Stopwatch();
-
-  @override
-  void initState() {
-    super.initState();
-    _requiredCount = widget.repo.registerEntryAndGetCost(widget.passService);
-    if (_requiredCount == 0) {
-      // Free entry this hour — no quiz, full pass. See design principle
-      // #4: "first entry free."
-      _phase = _Phase.granted;
-      _lastResult = AnswerResult.correct;
-    } else {
-      _current = widget.repo.nextGateItem();
-      _stopwatch.start();
-    }
-  }
-
-  @override
-  void dispose() {
-    _stopwatch.stop();
-    super.dispose();
-  }
-
-  void _choose(int index) {
-    if (_stopwatch.elapsed < widget.passService.guessThreshold) {
-      setState(() => _tooFastNotice = 'Answered too fast — try again.');
-      _stopwatch
-        ..reset()
-        ..start();
-      return;
-    }
-    _stopwatch.stop();
-
-    final result =
-        _current.isCorrect(index) ? AnswerResult.correct : AnswerResult.incorrect;
-    widget.repo.recordAnswer(_current, result);
-
-    setState(() {
-      _selectedIndex = index;
-      _lastResult = result;
-      _tooFastNotice = null;
-      _phase = _Phase.feedback;
-    });
-  }
-
-  void _continue() {
-    _answeredCount++;
-    if (_answeredCount >= _requiredCount) {
-      setState(() => _phase = _Phase.granted);
-      return;
-    }
-    setState(() {
-      _current = widget.repo.nextGateItem();
-      _selectedIndex = null;
-      _phase = _Phase.question;
-      _stopwatch
-        ..reset()
-        ..start();
-    });
-  }
+  final _pass = PassService();
 
   Future<void> _finish() async {
     final duration = widget.passService.passLengthFor(

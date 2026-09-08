@@ -1,12 +1,6 @@
 import '../models/answer_result.dart';
 
-/// Pure calculator for the two numbers the gate cares about: how many
-/// questions a given entry costs, and how long a pass a given answer
-/// earns. Deliberately stateless — the rolling-hour entry count it needs
-/// as input is tracked by the caller (currently [QuestionRepository]'s
-/// `registerEntryAndGetCost`), since that bookkeeping needs to survive
-/// process death per the README's threat model and doesn't belong in a
-/// pure calculator.
+/// Owns pass length and escalating cost.
 ///
 /// Defaults match the README's Configuration table. All of them are
 /// described there as "an opening guess, not a finding" — expect these
@@ -25,11 +19,8 @@ class PassService {
   final int guessThresholdSeconds;
   final int freeEntriesPerHour;
 
-  /// Cost, in questions, for each entry after the free ones. Plateaus at
-  /// the last value once exhausted — e.g. [1, 2, 3] means the 2nd entry
-  /// this hour costs 1 question, the 3rd costs 2, the 4th and beyond
-  /// cost 3.
-  final List<int> escalationCurve;
+  DateTime? _passExpiresAt;
+  final List<DateTime> _recentEntries = [];
 
   Duration get guessThreshold => Duration(seconds: guessThresholdSeconds);
 
