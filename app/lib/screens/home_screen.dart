@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../data/question_repository.dart';
 import '../models/progress.dart';
 import '../theme/app_theme.dart';
+import 'gate_screen.dart';
 
 /// The calm surface. New material is introduced here, never at the gate.
 ///
@@ -41,6 +42,14 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 44),
               _ProgressSection(stats: stats),
             ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        label: const Text('DEBUG: open gate'),
+        onPressed: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => GateScreen(repo: repo, blockedPackage: 'debug'),
           ),
         ),
       ),

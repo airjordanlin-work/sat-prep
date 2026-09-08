@@ -1,35 +1,34 @@
 [
   {
-    "id": "seed-001",
-    "section": "writing",
-    "skill": "transitions",
-    "difficulty": 2,
+    "id": "g1",
     "tier": "gate",
-    "stem": "The results were inconclusive. ______, the team repeated the experiment.",
-    "choices": ["Therefore", "However", "Similarly", "Nevertheless"],
-    "correct_index": 0,
-    "explanation": "The second sentence is a consequence of the first, so a cause-and-effect transition fits."
-  },
-  {
-    "id": "seed-002",
-    "section": "math",
-    "skill": "linear-equations",
-    "difficulty": 1,
-    "tier": "gate",
-    "stem": "If 3x + 6 = 21, what is x?",
+    "prompt": "Solve for x: 3x + 7 = 22",
     "choices": ["3", "5", "7", "9"],
-    "correct_index": 1,
-    "explanation": "Subtract 6 to get 3x = 15, then divide by 3."
+    "correctIndex": 1,
+    "explanation": "Subtract 7 from both sides to get 3x = 15, then divide by 3."
   },
   {
-    "id": "seed-003",
-    "section": "reading",
-    "skill": "vocabulary-in-context",
-    "difficulty": 3,
+    "id": "g2",
     "tier": "gate",
-    "stem": "As used in the sentence, 'reserved' most nearly means:",
-    "choices": ["set aside", "shy", "doubtful", "booked"],
-    "correct_index": 0,
-    "explanation": "Context governs the meaning, not the most common definition of the word."
+    "prompt": "In context, \"austere\" most nearly means:",
+    "choices": ["Lavish", "Severely simple", "Cheerful", "Talkative"],
+    "correctIndex": 1,
+    "explanation": "\"Austere\" describes something stark or without ornament."
+  },
+  {
+    "id": "g3",
+    "tier": "gate",
+    "prompt": "Which is correct: \"Neither the coach nor the players ___ ready.\"",
+    "choices": ["is", "are", "was", "be"],
+    "correctIndex": 1,
+    "explanation": "With \"neither/nor,\" the verb agrees with the nearer subject \u2014 \"players\" is plural, so \"are.\""
+  },
+  {
+    "id": "g4",
+    "tier": "gate",
+    "prompt": "What is 15% of 60?",
+    "choices": ["6", "9", "12", "15"],
+    "correctIndex": 1,
+    "explanation": "15% = 0.15, and 0.15 \u00d7 60 = 9."
   }
 ]

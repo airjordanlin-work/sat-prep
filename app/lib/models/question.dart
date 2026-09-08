@@ -25,4 +25,15 @@ class Question {
   final String? explanation;
 
   bool isCorrect(int choiceIndex) => choiceIndex == correctIndex;
+
+  factory Question.fromJson(Map<String, dynamic> json) {
+    return Question(
+      id: json['id'] as String,
+      tier: QuestionTier.values.byName(json['tier'] as String),
+      prompt: json['prompt'] as String,
+      choices: (json['choices'] as List).cast<String>(),
+      correctIndex: json['correctIndex'] as int,
+      explanation: json['explanation'] as String?,
+    );
+  }
 }

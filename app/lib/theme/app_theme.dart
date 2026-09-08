@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 /// One visual language for the whole app.
 ///
@@ -8,6 +7,13 @@ import 'package:google_fonts/google_fonts.dart';
 /// picks it up through Theme.of(context) instead of importing constants.
 /// That is what makes dark mode work and keeps the gate and the home
 /// screen from drifting into two different products.
+///
+/// Fonts are bundled locally (see pubspec.yaml `fonts:` section) rather
+/// than fetched via google_fonts at runtime. google_fonts hits Google's
+/// CDN on first paint, which on Flutter web means a network round trip
+/// before text renders in the right typeface, visible as a flash of
+/// fallback font and general sluggishness on first load. Bundling
+/// removes that entirely.
 class AppTheme {
   AppTheme._();
 
@@ -72,26 +78,37 @@ class AppTheme {
       colorScheme: scheme,
       scaffoldBackgroundColor: scheme.surface,
       dividerColor: scheme.outlineVariant,
+      // Bundled locally. See the `fonts:` block in pubspec.yaml — the
+      // family names here must match the `family:` values there exactly.
       textTheme: TextTheme(
-        displaySmall: GoogleFonts.fraunces(
+        displaySmall: TextStyle(
+          fontFamily: 'Fraunces',
           fontSize: 34, fontWeight: FontWeight.w600,
           height: 1.12, letterSpacing: -0.6, color: ink,
         ),
-        headlineSmall: GoogleFonts.fraunces(
+        headlineSmall: TextStyle(
+          fontFamily: 'Fraunces',
           fontSize: 24, fontWeight: FontWeight.w600,
           height: 1.2, letterSpacing: -0.3, color: ink,
         ),
-        titleLarge: GoogleFonts.inter(
+        titleLarge: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 20, fontWeight: FontWeight.w600, height: 1.35, color: ink,
         ),
-        titleMedium: GoogleFonts.inter(
+        titleMedium: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 16, fontWeight: FontWeight.w600, height: 1.35, color: ink,
         ),
-        bodyLarge: GoogleFonts.inter(fontSize: 16, height: 1.5, color: ink),
-        bodyMedium: GoogleFonts.inter(
+        bodyLarge: TextStyle(
+          fontFamily: 'Inter',
+          fontSize: 16, height: 1.5, color: ink,
+        ),
+        bodyMedium: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 14, height: 1.45, color: scheme.onSurfaceVariant,
         ),
-        labelSmall: GoogleFonts.inter(
+        labelSmall: TextStyle(
+          fontFamily: 'Inter',
           fontSize: 11, fontWeight: FontWeight.w600,
           letterSpacing: 1.1, color: scheme.onSurfaceVariant,
         ),
@@ -104,7 +121,8 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(radius),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: const TextStyle(
+            fontFamily: 'Inter',
             fontSize: 15, fontWeight: FontWeight.w600,
           ),
         ),

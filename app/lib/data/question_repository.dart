@@ -1,64 +1,71 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import '../models/answer_result.dart';
 import '../models/progress.dart';
 import '../models/question.dart';
 import '../services/pass_service.dart';
+import 'review_queue.dart';
 
-/// STUB. This satisfies the call sites in `main.dart`, `home_screen.dart`,
-/// and `gate_screen.dart` so the app links and runs today, but it does
-/// none of the real work yet:
-///
-///   - `load()` should read `assets/questions.json` into [Question]
-///     objects instead of using the fixed `_gateSample` list below.
-///   - `sessionSummary()` / `skillStats()` should derive their return
-///     values from the real review queue instead of sample data.
-///   - `nextGateItem()` should pull the next *due* gate-tier item from
-///     the spaced-repetition queue (`data/review_queue.dart`, not yet
-///     written), not cycle a fixed list.
-///   - `recordAnswer()` should actually update that queue — shorten the
-///     interval on incorrect, extend it on correct, and do nothing at
-///     all on tooFast (per the README, a discarded attempt isn't a rep).
-///   - `registerEntryAndGetCost()`'s rolling-hour window is in-memory
-///     only, so it resets on every process restart. The README's threat
-///     model requires pass/entry state to be server-authoritative and
-///     survive force-stop — this needs real persistence before M2.
-///
-/// If you already have a real `QuestionRepository`, tell me its actual
-/// shape and I'll conform the screens to that instead of this stub.
+/// Owns the question bank and the spaced-repetition queue built on top
+/// of it. This is the seam between "static content" (questions.json)
+/// and "per-user state" (what's due, what's been seen) — at M2 the
+/// queue's storage moves server-side, but this class's public shape
+/// should not need to change when that happens.
 class QuestionRepository {
   QuestionRepository();
 
   bool _loaded = false;
-  int _gateCursor = 0;
+  List<Question> _all = const [];
+  final ReviewQueue _queue = ReviewQueue();
   final List<DateTime> _recentEntries = [];
 
   Future<void> load() async {
-    // TODO(M1): read and parse assets/questions.json.
+    final raw = await rootBundle.loadString('assets/questions.json');
+    final list = jsonDecode(raw) as List;
+    _all = list
+        .map((e) => Question.fromJson(e as Map<String, dynamic>))
+        .toList();
     _loaded = true;
   }
 
+  List<Question> get _gatePool =>
+      _all.where((q) => q.tier == QuestionTier.gate).toList();
+
   SessionQueueSummary sessionSummary() {
     _assertLoaded();
+    // TODO(M2): derive from real session-tier due counts + logged reps.
     return SessionQueueSummary.sample();
   }
 
   List<SkillStat> skillStats() {
     _assertLoaded();
+    // TODO(M2): derive from real per-skill accuracy in the queue.
     return SkillStat.sampleSet();
   }
 
-  /// Next gate-tier item to serve. Cycles a fixed sample list for now.
+  /// Next gate-tier item to serve, from the real spaced-repetition
+  /// queue rather than a fixed cycling list.
   Question nextGateItem() {
     _assertLoaded();
-    final item = _gateSample[_gateCursor % _gateSample.length];
-    _gateCursor++;
-    return item;
+    final pool = _gatePool;
+    assert(pool.isNotEmpty, 'No gate-tier questions in the bank.');
+    return _queue.nextDue(DateTime.now(), pool) ?? pool.first;
   }
 
-  /// Records the outcome of a scored gate answer. No-op stub — real
-  /// implementation writes back to the review queue.
+  /// Records the outcome of a scored gate answer against the review
+  /// queue. Per the README, a tooFast attempt is discarded, not scored,
+  /// so it must never reach here — callers re-serve instead.
   void recordAnswer(Question question, AnswerResult result) {
     _assertLoaded();
-    // TODO(M1): update the review queue's interval for `question.id`.
+    assert(
+      result != AnswerResult.tooFast,
+      'tooFast answers are discarded, not recorded.',
+    );
+    _queue.record(
+      question.id,
+      correct: result == AnswerResult.correct,
+      now: DateTime.now(),
+    );
   }
 
   /// Registers a new entry attempt against the rolling one-hour window
@@ -76,42 +83,4 @@ class QuestionRepository {
   void _assertLoaded() {
     assert(_loaded, 'QuestionRepository.load() must complete before use.');
   }
-
-  static final List<Question> _gateSample = [
-    Question(
-      id: 'g1',
-      tier: QuestionTier.gate,
-      prompt: 'Solve for x: 3x + 7 = 22',
-      choices: ['3', '5', '7', '9'],
-      correctIndex: 1,
-      explanation:
-          'Subtract 7 from both sides to get 3x = 15, then divide by 3.',
-    ),
-    Question(
-      id: 'g2',
-      tier: QuestionTier.gate,
-      prompt: 'In context, "austere" most nearly means:',
-      choices: ['Lavish', 'Severely simple', 'Cheerful', 'Talkative'],
-      correctIndex: 1,
-      explanation: '"Austere" describes something stark or without ornament.',
-    ),
-    Question(
-      id: 'g3',
-      tier: QuestionTier.gate,
-      prompt: 'Which is correct: "Neither the coach nor the players ___ '
-          'ready."',
-      choices: ['is', 'are', 'was', 'be'],
-      correctIndex: 1,
-      explanation: 'With "neither/nor," the verb agrees with the nearer '
-          'subject — "players" is plural, so "are."',
-    ),
-    Question(
-      id: 'g4',
-      tier: QuestionTier.gate,
-      prompt: 'What is 15% of 60?',
-      choices: ['6', '9', '12', '15'],
-      correctIndex: 1,
-      explanation: '15% = 0.15, and 0.15 × 60 = 9.',
-    ),
-  ];
 }
