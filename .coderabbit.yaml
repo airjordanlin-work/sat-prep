@@ -1,0 +1,38 @@
+# CodeRabbit config. Free tier reviews public repos and PRs.
+language: en-US
+early_access: false
+
+reviews:
+  profile: chill          # 'assertive' is noisy on a solo repo
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: true
+
+  path_filters:
+    - "!**/build/**"
+    - "!**/.dart_tool/**"
+    - "!pipeline/reference/**"
+    - "!**/*.g.dart"
+
+  path_instructions:
+    - path: "app/lib/**"
+      instructions: >
+        Flutter/Dart. Flag missing null checks, un-disposed controllers,
+        and any business logic living in widget build methods.
+        Pass length and escalation logic must never be computed client-side
+        once the backend exists.
+    - path: "app/android/**"
+      instructions: >
+        Kotlin. Flag foreground service lifecycle bugs, leaked coroutine
+        scopes, missing permission checks before UsageStatsManager calls,
+        and battery-expensive polling intervals.
+    - path: "backend/supabase/migrations/**"
+      instructions: >
+        Postgres. Every user-scoped table must have RLS enabled with a
+        policy on auth.uid(). Flag any table without one.
+        Clients must never be able to write pass_state.
+
+chat:
+  auto_reply: true
