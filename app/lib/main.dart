@@ -3,6 +3,7 @@ import 'data/question_repository.dart';
 import 'screens/home_screen.dart';
 import 'screens/gate_screen.dart';
 import 'services/gate_channel.dart';
+import 'theme/app_theme.dart';
 
 const demoMode = bool.fromEnvironment('DEMO_MODE', defaultValue: true);
 
@@ -33,10 +34,13 @@ class GatekeeperApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey,
-      title: 'Gatekeeper',
-      theme: ThemeData(useMaterial3: true),
-      home: HomeScreen(repo: repo),
-    );
+              navigatorKey: navigatorKey,
+              title: 'Strolle',
+              theme: AppTheme.light(),
+              darkTheme: AppTheme.dark(),
+              themeMode: ThemeMode.system,
+              home: HomeScreen(repo: repo),
+            );
+
   }
 }
