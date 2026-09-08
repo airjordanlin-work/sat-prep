@@ -22,7 +22,7 @@ class GateScreen extends StatefulWidget {
 }
 
 class _GateScreenState extends State<GateScreen> {
-  final _pass = PassService();
+  //final _pass = PassService();
 
   // TODO(M1):
   //  1. Ask ReviewQueue for the next due item (fall back to a new

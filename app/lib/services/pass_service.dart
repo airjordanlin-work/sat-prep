@@ -16,7 +16,7 @@ class PassService {
   static const escalation = [0, 1, 2, 3];
 
   DateTime? _passExpiresAt;
-  final List<DateTime> _recentEntries = [];
+  //final List<DateTime> _recentEntries = [];
 
   bool isPassActive(DateTime now) =>
       _passExpiresAt != null && now.isBefore(_passExpiresAt!);
