@@ -1,21 +1,5 @@
-/// Outcome of one gate attempt.
-///
-/// Note there is no "denied" case. A wrong answer still grants entry,
-/// it just grants less of it. See design principle 2.
-enum AnswerOutcome {
-  correct,      // full pass
-  incorrect,    // short pass, item requeued sooner
-  tooFast,      // under the guess threshold: not counted, re-serve
-}
-
-class AnswerResult {
-  final AnswerOutcome outcome;
-  final Duration passGranted;
-  final String? explanation;
-
-  const AnswerResult({
-    required this.outcome,
-    required this.passGranted,
-    this.explanation,
-  });
-}
+/// Outcome of answering a single gate item. See the README's core loop:
+/// correct earns the long pass, incorrect earns the short one plus a
+/// shortened review interval, and tooFast discards the attempt entirely
+/// and re-serves the same item.
+enum AnswerResult { correct, incorrect, tooFast }
