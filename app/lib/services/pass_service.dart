@@ -2,9 +2,10 @@ import '../models/answer_result.dart';
 
 /// Owns pass length and escalating cost.
 ///
-/// Defaults match the README's Configuration table. All of them are
-/// described there as "an opening guess, not a finding" — expect these
-/// to become remote-configurable rather than hardcoded.
+/// Config only. Mutable session state (current pass expiry, the rolling
+/// entry window) deliberately does not live here, which is what lets the
+/// constructor stay const. At M2 that state moves server-side anyway.
+/// Keeping this class pure makes it trivially unit-testable.
 class PassService {
   const PassService({
     this.passLengthMinutes = 5,
@@ -19,13 +20,14 @@ class PassService {
   final int guessThresholdSeconds;
   final int freeEntriesPerHour;
 
-  DateTime? _passExpiresAt;
-  final List<DateTime> _recentEntries = [];
+  /// Questions owed on each successive entry past the free one.
+  /// Plateaus at the last value rather than climbing without bound:
+  /// absurd cost drives uninstalls, not compliance.
+  final List<int> escalationCurve;
 
   Duration get guessThreshold => Duration(seconds: guessThresholdSeconds);
 
-  /// [entryNumberThisHour] is 1-indexed (this is the Nth entry attempt
-  /// within the current rolling hour).
+  /// [entryNumberThisHour] is 1-indexed.
   int costForEntry(int entryNumberThisHour) {
     final index = entryNumberThisHour - freeEntriesPerHour - 1;
     if (index < 0) return 0;
@@ -33,13 +35,13 @@ class PassService {
     return escalationCurve[index];
   }
 
-  /// Pass length for a *scored* answer. Never call this with
-  /// [AnswerResult.tooFast] — a discarded attempt shouldn't grant
-  /// anything; callers must re-serve instead.
+  /// Pass length for a *scored* answer. Never call with
+  /// [AnswerResult.tooFast]: a discarded attempt grants nothing and the
+  /// caller must re-serve instead.
   Duration passLengthFor(AnswerResult result) {
     assert(
       result != AnswerResult.tooFast,
-      'tooFast answers are discarded, not scored — do not grant a pass off one.',
+      'tooFast answers are discarded, not scored.',
     );
     return result == AnswerResult.correct
         ? Duration(minutes: passLengthMinutes)

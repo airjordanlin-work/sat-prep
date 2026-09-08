@@ -4,14 +4,16 @@ import '../models/answer_result.dart';
 import '../models/question.dart';
 import '../services/gate_channel.dart';
 import '../services/pass_service.dart';
-import '../theme/palette.dart';
+import '../theme/app_theme.dart';
+import '../widgets/explanation_panel.dart';
+import '../widgets/question_card.dart';
 
-enum _Phase { question, feedback, granted }
+enum _Phase { answering, revealed }
 
-/// The screen that appears over the blocked app.
+/// The screen shown over the blocked app.
 ///
-/// [passService] is exposed for tests/tuning; leave it at its default
-/// in real usage.
+/// Not dismissible. PopScope blocks the back gesture; the Android side
+/// also excludes the Activity from recents.
 class GateScreen extends StatefulWidget {
   const GateScreen({
     super.key,
@@ -29,230 +31,200 @@ class GateScreen extends StatefulWidget {
 }
 
 class _GateScreenState extends State<GateScreen> {
-  final _pass = PassService();
+  late int _requiredCount;
+  int _answeredCount = 0;
 
-  Future<void> _finish() async {
-    final duration = widget.passService.passLengthFor(
-      _lastResult ?? AnswerResult.correct,
-    );
-    await GateChannel.grantPass(duration);
-    if (mounted) Navigator.of(context).pop();
+  late Question _current;
+  int? _selectedIndex;
+  _Phase _phase = _Phase.answering;
+  AnswerResult? _lastResult;
+  bool _tooFastNotice = false;
+
+  final _stopwatch = Stopwatch();
+
+  @override
+  void initState() {
+    super.initState();
+    _requiredCount = widget.repo.registerEntryAndGetCost(widget.passService);
+    if (_requiredCount == 0) {
+      // Free entry this hour. Grant immediately, do not show a question.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _grantAndClose(
+            widget.passService.passLengthFor(AnswerResult.correct),
+          ));
+    }
+    _serveNext();
+  }
+
+  void _serveNext() {
+    setState(() {
+      _current = widget.repo.nextGateItem();
+      _selectedIndex = null;
+      _phase = _Phase.answering;
+      _lastResult = null;
+      _stopwatch
+        ..reset()
+        ..start();
+    });
+  }
+
+  void _choose(int index) {
+    _stopwatch.stop();
+    final elapsed = _stopwatch.elapsed;
+
+    // Under the guess threshold: discard the attempt entirely and
+    // re-serve. Not a penalty, just not a rep.
+    if (elapsed < widget.passService.guessThreshold) {
+      setState(() => _tooFastNotice = true);
+      Future.delayed(const Duration(milliseconds: 900), () {
+        if (!mounted) return;
+        setState(() => _tooFastNotice = false);
+        _serveNext();
+      });
+      return;
+    }
+
+    final result = _current.isCorrect(index)
+        ? AnswerResult.correct
+        : AnswerResult.incorrect;
+
+    widget.repo.recordAnswer(_current, result);
+
+    setState(() {
+      _selectedIndex = index;
+      _lastResult = result;
+      _phase = _Phase.revealed;
+    });
+
+    // Correct answers need no explanation step. Get out of the way.
+    if (result == AnswerResult.correct) {
+      Future.delayed(const Duration(milliseconds: 550), _advance);
+    }
+  }
+
+  void _advance() {
+    if (!mounted) return;
+    final answered = _answeredCount + 1;
+    if (answered >= _requiredCount) {
+      _grantAndClose(widget.passService.passLengthFor(_lastResult!));
+      return;
+    }
+    setState(() => _answeredCount = answered);
+    _serveNext();
+  }
+
+  Future<void> _grantAndClose(Duration length) async {
+    await GateChannel.grantPass(length);
+    if (mounted) Navigator.of(context).maybePop();
+  }
+
+  @override
+  void dispose() {
+    _stopwatch.stop();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final showExplanation = _phase == _Phase.revealed &&
+        _lastResult == AnswerResult.incorrect;
+
     return PopScope(
-      // The gate is a boundary, not a scrollable screen — back button
-      // shouldn't quietly dismiss it without granting or denying a pass.
       canPop: false,
       child: Scaffold(
-        backgroundColor: AppPalette.paper,
         body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: switch (_phase) {
-              _Phase.question => _buildQuestion(),
-              _Phase.feedback => _buildFeedback(),
-              _Phase.granted => _buildGranted(),
-            },
+            padding: const EdgeInsets.all(AppTheme.gutter),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _ProgressDots(
+                  total: _requiredCount,
+                  done: _answeredCount,
+                ),
+                const SizedBox(height: 28),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: AnimatedSwitcher(
+                      duration: AppTheme.motion,
+                      child: KeyedSubtree(
+                        key: ValueKey(_current.id),
+                        child: QuestionCard(
+                          question: _current,
+                          selectedIndex: _selectedIndex,
+                          revealedCorrectIndex: _phase == _Phase.revealed
+                              ? _current.correctIndex
+                              : null,
+                          onChoiceTapped: _choose,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                AnimatedSize(
+                  duration: AppTheme.motion,
+                  curve: Curves.easeOut,
+                  child: _tooFastNotice
+                      ? Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: Text(
+                            'Give it a second. Same question again.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                if (showExplanation) ...[
+                  const SizedBox(height: 16),
+                  ExplanationPanel(
+                    explanation: _current.explanation ??
+                        'Review this one next time it comes up.',
+                    correctChoice: _current.choices[_current.correctIndex],
+                  ),
+                  const SizedBox(height: 16),
+                  FilledButton(
+                    onPressed: _advance,
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-
-  Widget _buildQuestion() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (_requiredCount > 1)
-          Text(
-            'Question ${_answeredCount + 1} of $_requiredCount',
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppPalette.inkMuted,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        const SizedBox(height: 16),
-        Text(
-          _current.prompt,
-          style: const TextStyle(
-            fontFamily: 'Georgia',
-            fontSize: 22,
-            fontWeight: FontWeight.w600,
-            color: AppPalette.ink,
-            height: 1.3,
-          ),
-        ),
-        const SizedBox(height: 28),
-        for (var i = 0; i < _current.choices.length; i++) ...[
-          _ChoiceButton(label: _current.choices[i], onTap: () => _choose(i)),
-          const SizedBox(height: 12),
-        ],
-        if (_tooFastNotice != null) ...[
-          const SizedBox(height: 4),
-          Text(
-            _tooFastNotice!,
-            style: const TextStyle(fontSize: 13, color: AppPalette.down),
-          ),
-        ],
-        const Spacer(),
-        const Text(
-          'A wrong answer still gets you in — just for less time.',
-          style: TextStyle(fontSize: 12, color: AppPalette.inkMuted),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildFeedback() {
-    final correct = _lastResult == AnswerResult.correct;
-    final tint = correct ? AppPalette.accent : AppPalette.down;
-    final isLastQuestion = _answeredCount + 1 >= _requiredCount;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              correct ? Icons.check_circle_outline : Icons.cancel_outlined,
-              color: tint,
-              size: 20,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              correct ? 'Correct' : 'Not quite',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w600,
-                color: tint,
-              ),
-            ),
-          ],
-        ),
-        if (!correct && _current.explanation != null) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              border: Border(left: BorderSide(color: tint, width: 3)),
-            ),
-            child: Text(
-              _current.explanation!,
-              style: const TextStyle(
-                fontSize: 14.5,
-                color: AppPalette.ink,
-                height: 1.4,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            "It'll come back around sooner because of this one.",
-            style: TextStyle(fontSize: 12.5, color: AppPalette.inkMuted),
-          ),
-        ],
-        const Spacer(),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _continue,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppPalette.accent,
-              foregroundColor: AppPalette.paper,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            child: Text(isLastQuestion ? 'Continue' : 'Next question'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildGranted() {
-    final duration = widget.passService.passLengthFor(
-      _lastResult ?? AnswerResult.correct,
-    );
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Icon(Icons.lock_open, color: AppPalette.accent, size: 26),
-        const SizedBox(height: 16),
-        Text(
-          "You're in for ${_formatDuration(duration)}.",
-          style: const TextStyle(
-            fontFamily: 'Georgia',
-            fontSize: 24,
-            fontWeight: FontWeight.w600,
-            color: AppPalette.ink,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'The gate comes back when the pass runs out.',
-          style: TextStyle(fontSize: 14, color: AppPalette.inkMuted),
-        ),
-        const SizedBox(height: 32),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _finish,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppPalette.accent,
-              foregroundColor: AppPalette.paper,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ),
-            child: const Text('Done'),
-          ),
-        ),
-      ],
-    );
-  }
 }
 
-class _ChoiceButton extends StatelessWidget {
-  const _ChoiceButton({required this.label, required this.onTap});
+/// Only rendered when more than one question is owed, so a single-question
+/// gate stays as bare as possible.
+class _ProgressDots extends StatelessWidget {
+  const _ProgressDots({required this.total, required this.done});
 
-  final String label;
-  final VoidCallback onTap;
+  final int total;
+  final int done;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(4),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-          decoration: BoxDecoration(
-            border: Border.all(color: AppPalette.hairline),
-            borderRadius: BorderRadius.circular(4),
+    if (total <= 1) return const SizedBox(height: 8);
+    final scheme = Theme.of(context).colorScheme;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < total; i++)
+          AnimatedContainer(
+            duration: AppTheme.motion,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            width: i < done ? 22 : 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: i < done ? scheme.primary : scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(4),
+            ),
           ),
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 15.5, color: AppPalette.ink),
-          ),
-        ),
-      ),
+      ],
     );
   }
-}
-
-String _formatDuration(Duration d) {
-  if (d.inSeconds < 60) return '${d.inSeconds} seconds';
-  final minutes = d.inMinutes;
-  return '$minutes minute${minutes == 1 ? '' : 's'}';
 }
