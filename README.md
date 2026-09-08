@@ -1,4 +1,4 @@
-# Gatekeeper
+# Strolle
 
 Social media apps stay locked until you answer an SAT question. Answering buys you a short pass. When the pass runs out, the lock comes back.
 
