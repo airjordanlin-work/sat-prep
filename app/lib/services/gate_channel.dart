@@ -1,30 +1,36 @@
 import 'package:flutter/services.dart';
 
-/// Bridge to the native blocking layer.
-///
-/// Android (M1): the foreground service calls [onGateRequested] when a
-/// blocked package comes to the foreground.
-/// iOS (M4): ShieldActionExtension opens the app, which calls the same
-/// path. Keep this interface platform-agnostic.
+/// STUB. Real implementation bridges to `UsageMonitor.kt` /
+/// `GatekeeperService.kt` on Android (see repo layout) via a
+/// `MethodChannel`. This satisfies the call sites in `main.dart`
+/// (`onGateRequested`) and `gate_screen.dart` (`grantPass`) so the app
+/// links and runs, including in DEMO_MODE where there's no native
+/// implementation registered at all.
 class GateChannel {
-  static const _channel = MethodChannel('com.gatekeeper.app/gate');
+  GateChannel._();
 
-  /// Native asks Dart to show the gate.
-  static void onGateRequested(void Function(String package) handler) {
+  static const _channel = MethodChannel('gatekeeper/gate');
+
+  /// Registers [onRequested] to fire whenever the native side detects a
+  /// blocked package was launched. Called once from `main.dart`.
+  static void onGateRequested(void Function(String package) onRequested) {
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'gateRequested') {
-        handler(call.arguments as String? ?? 'unknown');
+        onRequested(call.arguments as String);
       }
+      return null;
     });
   }
 
-  /// Dart tells native the pass is granted and for how long.
-  static Future<void> grantPass(Duration duration) =>
-      _channel.invokeMethod('grantPass', {'seconds': duration.inSeconds});
-
-  static Future<bool> hasRequiredPermissions() async =>
-      await _channel.invokeMethod<bool>('hasPermissions') ?? false;
-
-  static Future<void> openPermissionSettings() =>
-      _channel.invokeMethod('openPermissionSettings');
+  /// Tells the native side to lift the shield for [length] and record
+  /// `pass_expires_at`. In DEMO_MODE (no native plugin registered) this
+  /// is a no-op rather than a crash.
+  static Future<void> grantPass(Duration length) async {
+    try {
+      await _channel.invokeMethod('grantPass', length.inSeconds);
+    } on MissingPluginException {
+      // No native implementation yet — expected in DEMO_MODE / on
+      // platforms without the Android service wired up.
+    }
+  }
 }
