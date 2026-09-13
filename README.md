@@ -1,4 +1,4 @@
-# Gatekeeper
+# Strolle
 
 Social media apps stay locked until you answer an SAT question. Answering buys you a short pass. When the pass runs out, the lock comes back.
 
@@ -12,12 +12,14 @@ Built for high school students (16+) preparing for the SAT.
 
 | Component | State |
 | --- | --- |
-| Flutter quiz UI + local question set | In progress (M1) |
-| Android launch detection + gate | In progress (M1) |
-| Spaced-repetition review queue | In progress (M1) |
-| Supabase schema + server-side grading | Planned (M2) |
-| Content generation pipeline | Planned (M2) |
-| iOS Screen Time shield | Planned (M3), pending Apple entitlement |
+| Flutter quiz UI + local question set | Done (M1) |
+| Android launch detection + gate | Done (M1) |
+| Spaced-repetition review queue | Done (M1), client-side |
+| Supabase schema (`pass_state`, `attempts`, `review_items`) + RLS | Done (M2), verified locally, not yet on a hosted project |
+| `grade-attempt` Edge Function | Done (M2), verified end-to-end locally against real database writes |
+| Escalating-cost / rolling-window function | Planned (M2) |
+| Content generation pipeline | Planned (M2) — question bank currently exists only as bundled JSON, duplicated between the Flutter app and the grading function; needs a real shared source |
+| iOS Screen Time shield | Planned (M3) — Apple Developer account active, Family Controls entitlement requested, awaiting approval |
 | Motivation layer | Partly M2, rest M4 |
 
 Sections marked **[planned]** describe intended behavior, not shipped behavior.
@@ -32,7 +34,7 @@ Sections marked **[planned]** describe intended behavior, not shipped behavior.
      user taps it
             │
             ▼
-   Gatekeeper takes over the screen
+   Strolle takes over the screen
             │
    serves the next item due from the
    user's spaced-repetition queue
@@ -116,7 +118,7 @@ Friction, not enforcement. Uninstalling defeats it and no defense is planned. Pa
 ## Repo layout
 
 ```
-gatekeeper/
+strolle/
 ├─ .coderabbit.yaml            PR review config
 ├─ .github/workflows/ci.yml    analyze + test on PR
 ├─ app/
@@ -138,10 +140,10 @@ gatekeeper/
 │  │     └─ home_screen.dart   calm surface, new material
 │  └─ android/app/src/main/
 │     ├─ AndroidManifest.snippet.xml
-│     └─ kotlin/com/gatekeeper/app/
+│     └─ kotlin/com/strolle/app/
 │        ├─ MainActivity.kt
 │        ├─ GateActivity.kt
-│        ├─ GatekeeperService.kt
+│        ├─ StrolleService.kt
 │        └─ UsageMonitor.kt
 ├─ backend/supabase/migrations/0001_init.sql
 ├─ pipeline/src/generate.py
@@ -161,8 +163,8 @@ An iOS app cannot be containerized. Docker covers the backend and pipeline. The 
 ### Tier 2: quiz UI in a browser (2 minutes)
 
 ```bash
-git clone https://github.com/<you>/gatekeeper.git
-cd gatekeeper/app
+git clone https://github.com/<you>/strolle.git
+cd strolle/app
 flutter pub get
 flutter run -d chrome --dart-define=DEMO_MODE=true
 ```
@@ -200,11 +202,11 @@ adb install build/app/outputs/flutter-apk/app-debug.apk
 
 Grant both by hand:
 
-1. Settings → Apps → Special app access → **Usage access** → Gatekeeper
-2. Settings → Apps → Special app access → **Display over other apps** → Gatekeeper
+1. Settings → Apps → Special app access → **Usage access** → Strolle
+2. Settings → Apps → Special app access → **Display over other apps** → Strolle
 
 ```bash
-adb logcat -s Gatekeeper
+adb logcat -s Strolle
 ```
 
 ### Tier 5: iOS
