@@ -1,0 +1,35 @@
+[
+  {
+    "id": "seed-001",
+    "section": "writing",
+    "skill": "transitions",
+    "difficulty": 2,
+    "tier": "gate",
+    "stem": "The results were inconclusive. ______, the team repeated the experiment.",
+    "choices": ["Therefore", "However", "Similarly", "Nevertheless"],
+    "correct_index": 0,
+    "explanation": "The second sentence is a consequence of the first, so a cause-and-effect transition fits."
+  },
+  {
+    "id": "seed-002",
+    "section": "math",
+    "skill": "linear-equations",
+    "difficulty": 1,
+    "tier": "gate",
+    "stem": "If 3x + 6 = 21, what is x?",
+    "choices": ["3", "5", "7", "9"],
+    "correct_index": 1,
+    "explanation": "Subtract 6 to get 3x = 15, then divide by 3."
+  },
+  {
+    "id": "seed-003",
+    "section": "reading",
+    "skill": "vocabulary-in-context",
+    "difficulty": 3,
+    "tier": "gate",
+    "stem": "As used in the sentence, 'reserved' most nearly means:",
+    "choices": ["set aside", "shy", "doubtful", "booked"],
+    "correct_index": 0,
+    "explanation": "Context governs the meaning, not the most common definition of the word."
+  }
+]
